@@ -1,88 +1,241 @@
 # OrthoSchedule
 
-This workspace contains a React/Vite frontend and Node/Express backend for the OrthoSchedule orthopedic appointment system.
+OrthoSchedule is a full-stack orthopedic appointment management system. It includes a React/Vite frontend, a Node/Express REST API backend, and a PostgreSQL database.
 
-## Frontend
+Users can register as patients or providers. Patients can browse orthopedic providers, view availability, book appointments, and cancel appointments. Providers can log in and view booked patient appointments on a calendar.
 
-Location: `frontend/`
+## Repository
 
-### Install dependencies
-
-Open a terminal in `frontend/` and run:
-
-```powershell
-npm install
+```text
+https://github.com/jmsmaria-dev/orthoportal_project
 ```
 
-### Run development server
+## Tech Stack
+
+- Frontend: React, Vite, React Icons
+- Backend: Node.js, Express
+- Database: PostgreSQL
+- Authentication: JWT
+- Email reminders: Nodemailer and node-cron scaffolding
+- Local database: Docker Compose with PostgreSQL
+
+## Prerequisites
+
+Install these before running the project:
+
+- Git
+- Node.js 18 or newer
+- npm
+- Docker Desktop
+
+Make sure Docker Desktop is running before starting PostgreSQL.
+
+## Clone The Project
 
 ```powershell
-npm run dev
+git clone https://github.com/jmsmaria-dev/orthoportal_project.git
+cd orthoportal_project
 ```
 
-The frontend calls the backend at `http://localhost:4000/api` by default. To point it somewhere else, create `frontend/.env`:
+If you already cloned the project, update it with:
 
 ```powershell
-VITE_API_BASE_URL=http://localhost:4000/api
+git pull origin main
 ```
 
-## Backend
+## Project Structure
 
-Location: `backend/`
-
-The backend implements:
-
-- JWT authentication with patient, provider, and administrator roles.
-- Provider listing and filtering.
-- Provider availability calculation from working hours and booked appointments.
-- Appointment booking, cancellation, and rescheduling endpoints.
-- PostgreSQL double-booking protection using an exclusion constraint.
-- Nodemailer and node-cron reminder job scaffolding for upcoming appointments.
-
-### Install dependencies
-
-Open a terminal in `backend/` and run:
-
-```powershell
-npm install
-Copy-Item .env.example .env
+```text
+orthoportal_project/
+  backend/              Node/Express API
+  frontend/             React/Vite app
+  docker-compose.yml    Local PostgreSQL container
+  README.md             Setup and usage guide
 ```
 
-Edit `backend/.env` and set `DATABASE_URL` to your PostgreSQL database.
+## Start PostgreSQL
 
-For local development with Docker, the included `docker-compose.yml` starts PostgreSQL with the same default `DATABASE_URL`:
+From the project root:
 
 ```powershell
 docker compose up -d postgres
 ```
 
-### Initialize and seed PostgreSQL
+Check that the container is running:
+
+```powershell
+docker compose ps
+```
+
+The default local database connection is:
+
+```text
+postgres://postgres:postgres@localhost:5432/orthoschedule
+```
+
+## Backend Setup
+
+Open a terminal from the project root:
+
+```powershell
+cd backend
+npm install
+Copy-Item .env.example .env
+```
+
+The default `.env` values are ready for the included Docker PostgreSQL database. If you use a different PostgreSQL instance, edit `backend/.env` and update `DATABASE_URL`.
+
+Initialize and seed the database:
 
 ```powershell
 npm run db:init
 npm run db:seed
 ```
 
-Demo accounts created by the seed script:
-
-- Patient: `patient@ortho.test` / `patient123`
-- Provider: `anderson@ortho.test` / `provider123`
-- Administrator: `admin@ortho.test` / `admin123`
-
-The login screen also supports registering new patient or provider accounts. Provider registration creates a provider profile and weekday working hours automatically.
-
-### Run development API server
+Start the backend API:
 
 ```powershell
 npm run dev
 ```
 
-The API will run at `http://localhost:4000/api`.
+The backend runs at:
 
-### Core API routes
+```text
+http://localhost:4000/api
+```
+
+Health check:
+
+```text
+http://localhost:4000/api/health
+```
+
+## Frontend Setup
+
+Open a second terminal from the project root:
+
+```powershell
+cd frontend
+npm install
+npm run dev
+```
+
+The frontend usually runs at:
+
+```text
+http://127.0.0.1:5173
+```
+
+If Vite chooses another port, use the URL printed in the terminal.
+
+The frontend calls this API by default:
+
+```text
+http://localhost:4000/api
+```
+
+To use a different API URL, create `frontend/.env`:
+
+```powershell
+VITE_API_BASE_URL=http://localhost:4000/api
+```
+
+## Demo Accounts
+
+After running `npm run db:seed`, use these accounts:
+
+```text
+Patient
+Email: patient@ortho.test
+Password: patient123
+
+Provider
+Email: anderson@ortho.test
+Password: provider123
+
+Administrator
+Email: admin@ortho.test
+Password: admin123
+```
+
+The login screen also has demo buttons for patient and provider login.
+
+## Registering New Users
+
+The app supports registering:
+
+- Patient accounts
+- Provider accounts
+
+Provider registration automatically creates:
+
+- Provider profile
+- Specialty
+- Clinic location
+- Weekday working hours from 8:00 AM to 4:30 PM
+
+## Common Development Commands
+
+Run backend:
+
+```powershell
+cd backend
+npm run dev
+```
+
+Run frontend:
+
+```powershell
+cd frontend
+npm run dev
+```
+
+Build frontend:
+
+```powershell
+cd frontend
+npm run build
+```
+
+Re-run database schema:
+
+```powershell
+cd backend
+npm run db:init
+```
+
+Re-seed demo data:
+
+```powershell
+cd backend
+npm run db:seed
+```
+
+Stop PostgreSQL container:
+
+```powershell
+docker compose stop postgres
+```
+
+Stop and remove containers:
+
+```powershell
+docker compose down
+```
+
+Stop and remove containers plus database volume:
+
+```powershell
+docker compose down -v
+```
+
+Use `docker compose down -v` only when you want to delete local database data.
+
+## Core API Routes
 
 - `POST /api/auth/register`
 - `POST /api/auth/login`
+- `GET /api/auth/me`
 - `GET /api/providers`
 - `GET /api/providers/:id/availability?date=YYYY-MM-DD`
 - `GET /api/appointments`
@@ -90,8 +243,36 @@ The API will run at `http://localhost:4000/api`.
 - `PATCH /api/appointments/:id`
 - `DELETE /api/appointments/:id`
 
-### Notes
+Protected routes require a JWT bearer token.
 
-- Creating based on a wireframe design
-- Provider cards use icon placeholders instead of real photos.
-- Backend API and PostgreSQL integration are implemented in `backend/`.
+## Troubleshooting
+
+If the frontend cannot load providers:
+
+- Make sure the backend is running on `http://localhost:4000`.
+- Make sure PostgreSQL is running with `docker compose ps`.
+- Make sure `backend/.env` exists.
+- Re-run `npm run db:init` and `npm run db:seed`.
+
+If Docker commands fail:
+
+- Open Docker Desktop.
+- Wait until Docker says it is running.
+- Re-run `docker compose up -d postgres`.
+
+If login fails:
+
+- Confirm the database was seeded.
+- Use one of the demo accounts above.
+- Try refreshing the browser after restarting the backend.
+
+If port `4000` or `5173` is already in use:
+
+- Stop the process using that port, or let Vite choose another frontend port.
+- If changing the backend port, update `PORT` in `backend/.env` and `VITE_API_BASE_URL` in `frontend/.env`.
+
+## Notes
+
+- `.env`, `node_modules`, build output, and runtime logs are ignored by git.
+- Reminder emails are disabled locally by default with `REMINDERS_ENABLED=false`.
+- To enable email reminders, configure SMTP values in `backend/.env`.
