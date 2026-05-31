@@ -1,0 +1,19 @@
+import dotenv from 'dotenv';
+
+dotenv.config();
+
+export const config = {
+  port: Number(process.env.PORT || 4000),
+  databaseUrl: process.env.DATABASE_URL,
+  jwtSecret: process.env.JWT_SECRET || 'dev-only-change-me',
+  frontendOrigin: process.env.FRONTEND_ORIGIN || 'http://localhost:5173',
+  remindersEnabled: process.env.REMINDERS_ENABLED === 'true',
+  smtp: {
+    host: process.env.SMTP_HOST,
+    port: Number(process.env.SMTP_PORT || 465),
+    secure: process.env.SMTP_SECURE !== 'false',
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,
+    from: process.env.EMAIL_FROM || 'OrthoSchedule <no-reply@orthoschedule.local>'
+  }
+};
