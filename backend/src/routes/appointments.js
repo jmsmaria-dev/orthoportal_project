@@ -7,10 +7,40 @@ export const appointmentsRouter = express.Router();
 
 appointmentsRouter.use(authenticate);
 
+function dateBounds(date) {
+  const start = new Date(date);
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(start);
+  end.setDate(end.getDate() + 1);
+  return { start, end };
+}
+
+async function ensurePatientDailyLimit(client, patientId, startsAt, excludeAppointmentId = null) {
+  const { start, end } = dateBounds(startsAt);
+  const result = await client.query(
+    `SELECT id
+     FROM appointments
+     WHERE patient_id = $1
+       AND status = 'booked'
+       AND starts_at >= $2
+       AND starts_at < $3
+       AND ($4::BIGINT IS NULL OR id <> $4)
+     LIMIT 1`,
+    [patientId, start, end, excludeAppointmentId]
+  );
+
+  if (result.rowCount > 0) {
+    const error = new Error('Patients can only book one appointment per day. Please call support at 888-888-8888 for help.');
+    error.status = 409;
+    throw error;
+  }
+}
+
 appointmentsRouter.get('/', async (req, res, next) => {
   try {
     const baseSelect = `
       SELECT a.id, a.starts_at, a.ends_at, a.status, a.reason,
+             a.patient_id, a.provider_id,
              patient.name AS patient_name,
              provider_user.name AS provider_name,
              p.specialty, p.location
@@ -41,9 +71,14 @@ appointmentsRouter.get('/', async (req, res, next) => {
 
 appointmentsRouter.post('/', requireRole('patient', 'administrator'), async (req, res, next) => {
   try {
-    const { providerId, startsAt, reason } = req.body;
+    const { providerId, startsAt, reason, patientId } = req.body;
     if (!providerId || !startsAt) {
       return res.status(400).json({ error: 'Provider and start time are required.' });
+    }
+
+    const bookingPatientId = req.user.role === 'administrator' ? patientId : req.user.sub;
+    if (!bookingPatientId) {
+      return res.status(400).json({ error: 'Admin bookings require a patient.' });
     }
 
     const requestedStart = new Date(startsAt);
@@ -67,6 +102,10 @@ appointmentsRouter.post('/', requireRole('patient', 'administrator'), async (req
       }
 
       const startsAtDate = requestedStart;
+      if (req.user.role === 'patient') {
+        await ensurePatientDailyLimit(client, bookingPatientId, startsAtDate);
+      }
+
       const duration = providerResult.rows[0].appointment_duration_minutes;
       const endsAtDate = new Date(startsAtDate.getTime() + duration * 60 * 1000);
 
@@ -74,7 +113,7 @@ appointmentsRouter.post('/', requireRole('patient', 'administrator'), async (req
         `INSERT INTO appointments (patient_id, provider_id, starts_at, ends_at, reason)
          VALUES ($1, $2, $3, $4, $5)
          RETURNING id, patient_id, provider_id, starts_at, ends_at, status, reason`,
-        [req.user.sub, providerId, startsAtDate, endsAtDate, reason || null]
+        [bookingPatientId, providerId, startsAtDate, endsAtDate, reason || null]
       );
 
       return result.rows[0];
@@ -115,6 +154,20 @@ appointmentsRouter.patch('/:id', requireRole('patient', 'administrator'), async 
         ? new Date(nextStart.getTime() + existing.appointment_duration_minutes * 60 * 1000)
         : existing.ends_at;
       const nextStatus = status || existing.status;
+
+      if (startsAt && nextStatus === 'booked') {
+        const availableSlots = await getAvailability(existing.provider_id, nextStart.toISOString().slice(0, 10));
+        const isAvailable = availableSlots.some((slot) => slot.startsAt === nextStart.toISOString());
+        if (!isAvailable) {
+          const error = new Error('That appointment slot is unavailable.');
+          error.status = 409;
+          throw error;
+        }
+
+        if (req.user.role === 'patient') {
+          await ensurePatientDailyLimit(client, existing.patient_id, nextStart, existing.id);
+        }
+      }
 
       const result = await client.query(
         `UPDATE appointments

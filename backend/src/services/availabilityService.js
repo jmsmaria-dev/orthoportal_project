@@ -43,15 +43,30 @@ export async function getAvailability(providerId, date) {
     [providerId, dayStart, addMinutes(dayStart, 24 * 60)]
   );
 
-  const booked = appointmentsResult.rows.map((row) => ({
+  const absencesResult = await query(
+    `SELECT starts_at, ends_at
+     FROM provider_absences
+     WHERE provider_id = $1
+       AND starts_at < $3
+       AND ends_at > $2`,
+    [providerId, dayStart, addMinutes(dayStart, 24 * 60)]
+  );
+
+  const blocked = [
+    ...appointmentsResult.rows.map((row) => ({
+      start: new Date(row.starts_at),
+      end: addMinutes(new Date(row.ends_at), buffer)
+    })),
+    ...absencesResult.rows.map((row) => ({
     start: new Date(row.starts_at),
-    end: addMinutes(new Date(row.ends_at), buffer)
-  }));
+      end: new Date(row.ends_at)
+    }))
+  ];
 
   const slots = [];
   for (let start = dayStart; addMinutes(start, duration) <= dayEnd; start = addMinutes(start, duration + buffer)) {
     const end = addMinutes(start, duration);
-    const available = !booked.some((appointment) => overlaps(start, end, appointment.start, appointment.end));
+    const available = !blocked.some((block) => overlaps(start, end, block.start, block.end));
     if (available && start > new Date()) {
       slots.push({
         startsAt: start.toISOString(),

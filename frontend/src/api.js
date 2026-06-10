@@ -56,14 +56,25 @@ export function fetchAvailability(providerId, date) {
   return apiRequest(`/providers/${providerId}/availability?date=${date}`);
 }
 
+export function fetchMonthAvailability(providerId, month) {
+  return apiRequest(`/providers/${providerId}/availability/month?month=${month}`);
+}
+
 export function fetchAppointments() {
   return apiRequest('/appointments');
 }
 
-export function createAppointment(providerId, startsAt, reason) {
+export function updateAppointment(id, payload) {
+  return apiRequest(`/appointments/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload)
+  });
+}
+
+export function createAppointment(providerId, startsAt, reason, patientId) {
   return apiRequest('/appointments', {
     method: 'POST',
-    body: JSON.stringify({ providerId, startsAt, reason })
+    body: JSON.stringify({ providerId, startsAt, reason, patientId })
   });
 }
 
@@ -71,4 +82,43 @@ export function cancelAppointment(id) {
   return apiRequest(`/appointments/${id}`, {
     method: 'DELETE'
   });
+}
+
+export function fetchProfile() {
+  return apiRequest('/profile');
+}
+
+export function updateProfile(payload) {
+  return apiRequest('/profile', {
+    method: 'PATCH',
+    body: JSON.stringify(payload)
+  });
+}
+
+export function fetchProviderSchedule() {
+  return apiRequest('/providers/me/schedule');
+}
+
+export function updateProviderWorkingHours(workingHours) {
+  return apiRequest('/providers/me/working-hours', {
+    method: 'PUT',
+    body: JSON.stringify({ workingHours })
+  });
+}
+
+export function addProviderAbsence(payload) {
+  return apiRequest('/providers/me/absences', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+}
+
+export function deleteProviderAbsence(id) {
+  return apiRequest(`/providers/me/absences/${id}`, {
+    method: 'DELETE'
+  });
+}
+
+export function fetchAdminUsers() {
+  return apiRequest('/admin/users');
 }

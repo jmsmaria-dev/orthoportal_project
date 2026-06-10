@@ -314,8 +314,10 @@ button:disabled {
 }
 
 .auth-form input,
+.auth-form textarea,
 .auth-form select,
-.reason-field input {
+.reason-field input,
+.reason-field select {
   width: 100%;
   border: 1px solid var(--border-color);
   border-radius: 10px;
@@ -326,10 +328,26 @@ button:disabled {
 }
 
 .auth-form input:focus,
+.auth-form textarea:focus,
 .auth-form select:focus,
 .reason-field input:focus {
   outline: 2px solid #bfdbfe;
   border-color: var(--primary-blue);
+}
+
+.auth-form textarea {
+  min-height: 110px;
+  resize: vertical;
+}
+
+.profile-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.profile-form label:last-of-type,
+.profile-form .primary-button {
+  grid-column: 1 / -1;
 }
 
 .auth-toggle,
@@ -548,6 +566,13 @@ button:disabled {
   cursor: default;
 }
 
+.calendar-day.unavailable {
+  background: #e2e8f0;
+  color: #94a3b8;
+  border-color: #cbd5e1;
+  cursor: not-allowed;
+}
+
 .provider-calendar {
   padding: 20px;
 }
@@ -726,6 +751,18 @@ button:disabled {
   background: #fafbfc;
 }
 
+.appointment-row.past {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  opacity: 0.65;
+}
+
+.appointment-row.past h3,
+.appointment-row.past p,
+.appointment-row.past span {
+  color: #64748b;
+}
+
 .appointment-row h3 {
   margin: 0 0 4px;
   color: var(--dark-text);
@@ -819,6 +856,58 @@ button:disabled {
   text-align: right;
 }
 
+.schedule-list {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 24px;
+}
+
+.schedule-row {
+  display: grid;
+  grid-template-columns: 1fr 140px 140px;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  background: #fafbfc;
+}
+
+.schedule-row input[type="time"] {
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 10px;
+  font: inherit;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--dark-text);
+  font-weight: 700;
+}
+
+.absence-form {
+  margin: 22px 0;
+  padding: 18px;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  background: #fafbfc;
+}
+
+.absence-form h3 {
+  margin: 0;
+}
+
+.row-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 /* ===== RESPONSIVE ===== */
 @media (max-width: 1024px) {
   .booking-layout {
@@ -892,6 +981,13 @@ button:disabled {
 
   .timeslots-grid {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  .appointment-row,
+  .settings-list div,
+  .schedule-row,
+  .profile-form {
+    grid-template-columns: 1fr;
   }
 
   .appointment-row,

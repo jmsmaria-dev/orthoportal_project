@@ -18,19 +18,29 @@ CREATE TABLE IF NOT EXISTS users (
   email TEXT NOT NULL UNIQUE,
   password_hash TEXT NOT NULL,
   role user_role NOT NULL,
+  phone TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE users ADD COLUMN IF NOT EXISTS phone TEXT;
 
 CREATE TABLE IF NOT EXISTS providers (
   id BIGSERIAL PRIMARY KEY,
   user_id BIGINT NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
   specialty TEXT NOT NULL,
   location TEXT NOT NULL,
+  bio TEXT,
+  education TEXT,
+  years_experience INTEGER NOT NULL DEFAULT 0,
   rating NUMERIC(2,1) NOT NULL DEFAULT 4.8,
   reviews INTEGER NOT NULL DEFAULT 0,
   appointment_duration_minutes INTEGER NOT NULL DEFAULT 30,
   buffer_minutes INTEGER NOT NULL DEFAULT 0
 );
+
+ALTER TABLE providers ADD COLUMN IF NOT EXISTS bio TEXT;
+ALTER TABLE providers ADD COLUMN IF NOT EXISTS education TEXT;
+ALTER TABLE providers ADD COLUMN IF NOT EXISTS years_experience INTEGER NOT NULL DEFAULT 0;
 
 CREATE TABLE IF NOT EXISTS provider_working_hours (
   id BIGSERIAL PRIMARY KEY,
@@ -40,6 +50,18 @@ CREATE TABLE IF NOT EXISTS provider_working_hours (
   end_time TIME NOT NULL,
   UNIQUE (provider_id, day_of_week)
 );
+
+CREATE TABLE IF NOT EXISTS provider_absences (
+  id BIGSERIAL PRIMARY KEY,
+  provider_id BIGINT NOT NULL REFERENCES providers(id) ON DELETE CASCADE,
+  starts_at TIMESTAMPTZ NOT NULL,
+  ends_at TIMESTAMPTZ NOT NULL,
+  reason TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CHECK (ends_at > starts_at)
+);
+
+CREATE INDEX IF NOT EXISTS idx_provider_absences_provider ON provider_absences(provider_id, starts_at);
 
 CREATE TABLE IF NOT EXISTS appointments (
   id BIGSERIAL PRIMARY KEY,
@@ -59,13 +81,17 @@ CREATE INDEX IF NOT EXISTS idx_appointments_patient ON appointments(patient_id, 
 CREATE INDEX IF NOT EXISTS idx_appointments_provider ON appointments(provider_id, starts_at);
 
 DO $$ BEGIN
-  ALTER TABLE appointments
-    ADD CONSTRAINT appointments_no_provider_overlap
-    EXCLUDE USING gist (
-      provider_id WITH =,
-      tstzrange(starts_at, ends_at, '[)') WITH &&
-    )
-    WHERE (status = 'booked');
-EXCEPTION
-  WHEN duplicate_object THEN NULL;
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'appointments_no_provider_overlap'
+  ) THEN
+    ALTER TABLE appointments
+      ADD CONSTRAINT appointments_no_provider_overlap
+      EXCLUDE USING gist (
+        provider_id WITH =,
+        tstzrange(starts_at, ends_at, '[)') WITH &&
+      )
+      WHERE (status = 'booked');
+  END IF;
 END $$;
