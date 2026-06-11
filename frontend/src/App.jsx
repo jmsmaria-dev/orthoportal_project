@@ -34,8 +34,24 @@ import {
 import ProviderCard from './components/ProviderCard';
 
 const today = new Date();
-const dateFormatter = new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-const timeFormatter = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit' });
+const CLINIC_TIME_ZONE = import.meta.env.VITE_CLINIC_TIME_ZONE || 'America/New_York';
+const dateFormatter = new Intl.DateTimeFormat('en-US', {
+  timeZone: CLINIC_TIME_ZONE,
+  month: 'long',
+  day: 'numeric',
+  year: 'numeric'
+});
+const timeFormatter = new Intl.DateTimeFormat('en-US', {
+  timeZone: CLINIC_TIME_ZONE,
+  hour: 'numeric',
+  minute: '2-digit'
+});
+const clinicDatePartsFormatter = new Intl.DateTimeFormat('en-US', {
+  timeZone: CLINIC_TIME_ZONE,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit'
+});
 
 function getNextBusinessDay(date) {
   const nextDate = new Date(date);
@@ -47,6 +63,13 @@ function getNextBusinessDay(date) {
 
 function toDateInputValue(date) {
   return date.toISOString().slice(0, 10);
+}
+
+function toClinicDateKey(date) {
+  const parts = Object.fromEntries(
+    clinicDatePartsFormatter.formatToParts(date).map((part) => [part.type, part.value])
+  );
+  return `${parts.year}-${parts.month}-${parts.day}`;
 }
 
 function toDateTimeLocalValue(date) {
@@ -77,7 +100,7 @@ function getMonthDays(monthCursor) {
 function appointmentsForDate(appointments, date) {
   if (!date) return [];
   const dateValue = toDateInputValue(date);
-  return appointments.filter((appointment) => toDateInputValue(new Date(appointment.starts_at)) === dateValue);
+  return appointments.filter((appointment) => toClinicDateKey(new Date(appointment.starts_at)) === dateValue);
 }
 
 function isPastAppointment(appointment) {
