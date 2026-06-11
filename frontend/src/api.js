@@ -122,3 +122,9 @@ export function deleteProviderAbsence(id) {
 export function fetchAdminUsers() {
   return apiRequest('/admin/users');
 }
+
+export function sendAdminAppointmentReminder(id) {
+  return apiRequest(`/admin/appointments/${id}/reminder`, {
+    method: 'POST'
+  });
+}

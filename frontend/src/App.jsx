@@ -26,6 +26,7 @@ import {
   getStoredSession,
   login,
   registerUser,
+  sendAdminAppointmentReminder,
   storeSession,
   updateAppointment,
   updateProfile,
@@ -450,6 +451,21 @@ function App() {
       await createAppointment(selectedProviderId, selectedSlot, reason, adminPatientId);
       await reloadAppointmentsAndSlots();
       setStatusMessage('Admin appointment booked.');
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleSendReminder(id) {
+    setLoading(true);
+    setError('');
+
+    try {
+      await sendAdminAppointmentReminder(id);
+      await reloadAppointmentsAndSlots();
+      setStatusMessage('Reminder email sent.');
     } catch (requestError) {
       setError(requestError.message);
     } finally {
@@ -962,6 +978,9 @@ function App() {
                           <button className="link-button" disabled={loading} onClick={() => handleCancelAppointment(appointment.id)}>
                             Cancel
                           </button>
+                          <button className="link-button" disabled={loading} onClick={() => handleSendReminder(appointment.id)}>
+                            Send Reminder
+                          </button>
                         </>
                       )}
                     </div>
@@ -1093,6 +1112,11 @@ function App() {
                         <button className="link-button" disabled={loading} onClick={() => handleCancelAppointment(appointment.id)}>
                           Cancel
                         </button>
+                        {isAdmin && (
+                          <button className="link-button" disabled={loading} onClick={() => handleSendReminder(appointment.id)}>
+                            Send Reminder
+                          </button>
+                        )}
                         </>
                       )}
                     </div>

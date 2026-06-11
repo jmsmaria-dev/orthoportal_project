@@ -19,6 +19,50 @@ function createTransporter() {
   });
 }
 
+function isGenuineEmailAddress(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email || '') && !email.toLowerCase().endsWith('.test');
+}
+
+function formatAppointmentDateTime(startsAt) {
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone: config.appTimeZone,
+    dateStyle: 'full',
+    timeStyle: 'short'
+  }).format(new Date(startsAt));
+}
+
+export async function sendAppointmentReminder(appointment, { markSent = true, client = null } = {}) {
+  if (!isGenuineEmailAddress(appointment.email)) {
+    const error = new Error(`Cannot send reminder to invalid or test email address: ${appointment.email}`);
+    error.status = 400;
+    throw error;
+  }
+
+  const transporter = createTransporter();
+  if (!transporter) {
+    const error = new Error('SMTP credentials are missing.');
+    error.status = 500;
+    throw error;
+  }
+
+  const info = await transporter.sendMail({
+    from: config.smtp.from,
+    to: appointment.email,
+    subject: 'Your OrthoSchedule appointment reminder',
+    text: `Hi ${appointment.patient_name}, this is a reminder for your appointment with ${appointment.provider_name} on ${formatAppointmentDateTime(appointment.starts_at)}.`
+  });
+
+  if (markSent) {
+    const executor = client || pool;
+    await executor.query(
+      'UPDATE appointments SET reminder_sent_at = NOW(), updated_at = NOW() WHERE id = $1',
+      [appointment.id]
+    );
+  }
+
+  return info;
+}
+
 export function startReminderJob() {
   if (!config.remindersEnabled) {
     console.log('Appointment reminders are disabled.');
@@ -48,17 +92,15 @@ export function startReminderJob() {
       );
 
       for (const appointment of result.rows) {
-        await transporter.sendMail({
-          from: config.smtp.from,
-          to: appointment.email,
-          subject: 'Your OrthoSchedule appointment reminder',
-          text: `Hi ${appointment.patient_name}, this is a reminder for your appointment with ${appointment.provider_name} at ${appointment.starts_at}.`
-        });
-
-        await client.query(
-          'UPDATE appointments SET reminder_sent_at = NOW(), updated_at = NOW() WHERE id = $1',
-          [appointment.id]
-        );
+        try {
+          await sendAppointmentReminder(appointment, { client });
+        } catch (error) {
+          if (error.status === 400) {
+            console.warn(error.message);
+            continue;
+          }
+          throw error;
+        }
       }
 
       await client.query('COMMIT');
