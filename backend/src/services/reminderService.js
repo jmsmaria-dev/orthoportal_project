@@ -43,7 +43,7 @@ export function startReminderJob() {
          JOIN users u ON u.id = pr.user_id
          WHERE a.status = 'booked'
            AND a.reminder_sent_at IS NULL
-           AND a.starts_at BETWEEN NOW() AND NOW() + INTERVAL '24 hours'
+           AND a.starts_at BETWEEN NOW() AND NOW() + INTERVAL '12 hours'
          FOR UPDATE SKIP LOCKED`
       );
 
