@@ -1,10 +1,10 @@
-import cron from 'node-cron';
 import nodemailer from 'nodemailer';
+import { validate } from 'email-validator';
 import { config } from '../config.js';
-import { pool, query } from '../db/pool.js';
+import { pool } from '../db/pool.js';
 
 function createTransporter() {
-  if (!config.smtp.user || !config.smtp.pass) {
+  if (!config.smtp.pass) {
     return null;
   }
 
@@ -20,7 +20,7 @@ function createTransporter() {
 }
 
 function isGenuineEmailAddress(email) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email || '') && !email.toLowerCase().endsWith('.test');
+  return validate(email || '') && !email.toLowerCase().endsWith('.test');
 }
 
 function formatAppointmentDateTime(startsAt) {
@@ -48,8 +48,8 @@ export async function sendAppointmentReminder(appointment, { markSent = true, cl
   const info = await transporter.sendMail({
     from: config.smtp.from,
     to: appointment.email,
-    subject: 'Your OrthoSchedule appointment reminder',
-    text: `Hi ${appointment.patient_name}, this is a reminder for your appointment with ${appointment.provider_name} on ${formatAppointmentDateTime(appointment.starts_at)}.`
+    subject: 'Reminder: Your OrthoSchedule appointment is tomorrow',
+    text: `Hi ${appointment.patient_name},\n\nThis is a reminder that you have an appointment with ${appointment.provider_name} tomorrow on ${formatAppointmentDateTime(appointment.starts_at)}.\n\nIf you need to cancel or reschedule, please log in to OrthoSchedule.\n\nThank you,\nThe OrthoSchedule Team`
   });
 
   if (markSent) {
@@ -63,55 +63,50 @@ export async function sendAppointmentReminder(appointment, { markSent = true, cl
   return info;
 }
 
-export function startReminderJob() {
-  if (!config.remindersEnabled) {
-    console.log('Appointment reminders are disabled.');
-    return;
-  }
-
+export async function runReminderJob() {
   const transporter = createTransporter();
   if (!transporter) {
-    console.warn('Appointment reminders enabled, but SMTP credentials are missing.');
-    return;
+    throw new Error('SMTP credentials are missing.');
   }
 
-  cron.schedule('*/15 * * * *', async () => {
-    const client = await pool.connect();
-    try {
-      await client.query('BEGIN');
-      const result = await client.query(
-        `SELECT a.id, a.starts_at, p.name AS patient_name, p.email, u.name AS provider_name
-         FROM appointments a
-         JOIN users p ON p.id = a.patient_id
-         JOIN providers pr ON pr.id = a.provider_id
-         JOIN users u ON u.id = pr.user_id
-         WHERE a.status = 'booked'
-           AND a.reminder_sent_at IS NULL
-           AND a.starts_at BETWEEN NOW() AND NOW() + INTERVAL '12 hours'
-         FOR UPDATE SKIP LOCKED`
-      );
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const result = await client.query(
+      `SELECT a.id, a.starts_at, p.name AS patient_name, p.email, u.name AS provider_name
+       FROM appointments a
+       JOIN users p ON p.id = a.patient_id
+       JOIN providers pr ON pr.id = a.provider_id
+       JOIN users u ON u.id = pr.user_id
+       WHERE a.status = 'booked'
+         AND a.reminder_sent_at IS NULL
+         AND a.starts_at BETWEEN NOW() + INTERVAL '23 hours' AND NOW() + INTERVAL '24 hours'
+       FOR UPDATE SKIP LOCKED`
+    );
 
-      for (const appointment of result.rows) {
-        try {
-          await sendAppointmentReminder(appointment, { client });
-        } catch (error) {
-          if (error.status === 400) {
-            console.warn(error.message);
-            continue;
-          }
-          throw error;
+    const results = { sent: 0, skipped: 0, failed: 0 };
+
+    for (const appointment of result.rows) {
+      try {
+        await sendAppointmentReminder(appointment, { client });
+        results.sent++;
+      } catch (error) {
+        if (error.status === 400) {
+          console.warn(error.message);
+          results.skipped++;
+          continue;
         }
+        results.failed++;
+        throw error;
       }
-
-      await client.query('COMMIT');
-    } catch (error) {
-      await client.query('ROLLBACK');
-      console.error('Reminder job failed:', error);
-    } finally {
-      client.release();
     }
-  });
 
-  query('SELECT NOW()').catch(() => {});
-  console.log('Appointment reminder job started.');
+    await client.query('COMMIT');
+    return results;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
 }

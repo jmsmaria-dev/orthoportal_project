@@ -175,6 +175,7 @@ appointmentsRouter.patch('/:id', requireRole('patient', 'administrator'), async 
              ends_at = $2,
              status = $3,
              reason = COALESCE($4, reason),
+             reminder_sent_at = CASE WHEN $1 <> starts_at THEN NULL ELSE reminder_sent_at END,
              updated_at = NOW()
          WHERE id = $5
          RETURNING id, patient_id, provider_id, starts_at, ends_at, status, reason`,
@@ -212,3 +213,4 @@ appointmentsRouter.delete('/:id', requireRole('patient', 'administrator'), async
     next(error);
   }
 });
+

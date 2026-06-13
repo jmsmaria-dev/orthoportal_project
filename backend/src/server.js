@@ -8,7 +8,6 @@ import { authRouter } from './routes/auth.js';
 import { adminRouter } from './routes/admin.js';
 import { profileRouter } from './routes/profile.js';
 import { providersRouter } from './routes/providers.js';
-import { startReminderJob } from './services/reminderService.js';
 
 const app = express();
 const allowedOrigins = new Set([
@@ -54,5 +53,4 @@ app.use((error, _req, res, _next) => {
 
 app.listen(config.port, () => {
   console.log(`OrthoSchedule API listening on http://localhost:${config.port}`);
-  startReminderJob();
 });

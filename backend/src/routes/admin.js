@@ -1,9 +1,25 @@
 import express from 'express';
 import { query } from '../db/pool.js';
 import { authenticate, requireRole } from '../middleware/auth.js';
-import { sendAppointmentReminder } from '../services/reminderService.js';
+import { sendAppointmentReminder, runReminderJob } from '../services/reminderService.js';
+import { config } from '../config.js';
 
 export const adminRouter = express.Router();
+
+// CRON_SECRET secured endpoint for GitHub Actions
+adminRouter.post('/send-reminders', async (req, res, next) => {
+  try {
+    const secret = req.headers['x-cron-secret'];
+    if (!secret || secret !== config.cronSecret) {
+      return res.status(401).json({ error: 'Unauthorized.' });
+    }
+
+    const results = await runReminderJob();
+    res.json({ message: 'Reminder job complete.', results });
+  } catch (error) {
+    next(error);
+  }
+});
 
 adminRouter.use(authenticate, requireRole('administrator'));
 
